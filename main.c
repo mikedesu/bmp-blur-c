@@ -6,9 +6,7 @@
 #define BMP_HEADER_SIZE_BYTES 14
 #define BMP_DIB_HEADER_SIZE_BYTES 40
 #define MAXIMUM_IMAGE_SIZE 256
-
 #define BYTE_PAD(n) (n%4)
-
 
 struct BMP_Header {
 	char signature[2];		//ID field
@@ -17,7 +15,6 @@ struct BMP_Header {
 	short reserved2;		//Application specific
 	int offset_pixel_array;  //Offset where the pixel array (bitmap data) can be found
 };
-
 
 struct DIB_Header {
     int size; // Number of bytes in DIB Header
@@ -39,12 +36,10 @@ struct Pixel {
     unsigned char b;
 };
 
-
 struct PixelRow {
     struct Pixel *pixels;
     char *pad;
 };
-
 
 struct boxBlurArgs {
     int height;
@@ -54,34 +49,37 @@ struct boxBlurArgs {
     struct PixelRow * blurredPixelRows;
 };
 
+
 void print_usage(char **argv) {
     fprintf(stderr, "Usage: ./%s <input_bitmap_file> <output_bitmap_file>\n", argv[0]);
     exit(-1);
 }
 
+
 void * computeBoxBlur(void *blurArgs);
 
-int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        print_usage(argv);
-    }
-    
-	FILE* infile = fopen(argv[1], "rb");
-    if (!infile) {
-        fprintf(stderr, "No filename or bad filename specified\n");
-        print_usage(argv);
-    }
-    
+struct BMP_Header readBmpHeader(FILE *infile) {
     struct BMP_Header bmpHeader;
+    //read bitmap file header (14 bytes)
+	fread(&(bmpHeader.signature), sizeof(char)*2, 1, infile);
+    fread(&(bmpHeader.size), sizeof(int), 1, infile);
+    fread(&(bmpHeader.reserved1), sizeof(short), 1, infile);
+    fread(&(bmpHeader.reserved2), sizeof(short), 1, infile);
+    fread(&(bmpHeader.offset_pixel_array), sizeof(int), 1, infile);
+    
+    printf("signature: %c%c\n", bmpHeader.signature[0], bmpHeader.signature[1]);
+	printf("size: %d\n", bmpHeader.size);
+	printf("reserved1: %d\n", bmpHeader.reserved1);
+	printf("reserved2: %d\n", bmpHeader.reserved2);
+	printf("offset_pixel_array: %d\n", bmpHeader.offset_pixel_array);
+
+
+    
+    return bmpHeader;
+}
+
+struct DIB_Header readDibHeader(FILE *infile) {
     struct DIB_Header dibHeader;
-
-	//read bitmap file header (14 bytes)
-	fread(&bmpHeader.signature, sizeof(char)*2, 1, infile);
-    fread(&bmpHeader.size, sizeof(int), 1, infile);
-    fread(&bmpHeader.reserved1, sizeof(short), 1, infile);
-    fread(&bmpHeader.reserved2, sizeof(short), 1, infile);
-    fread(&bmpHeader.offset_pixel_array, sizeof(int), 1, infile);
-
     fread(&dibHeader.size, sizeof(int), 1, infile);
     fread(&dibHeader.width, sizeof(int), 1, infile);
     fread(&dibHeader.height, sizeof(int), 1, infile);
@@ -94,12 +92,6 @@ int main(int argc, char *argv[]) {
     fread(&dibHeader.numColorsInPalette, sizeof(int), 1, infile);
     fread(&dibHeader.numImportantColors, sizeof(int), 1, infile);
 
-    printf("signature: %c%c\n", bmpHeader.signature[0], bmpHeader.signature[1]);
-	printf("size: %d\n", bmpHeader.size);
-	printf("reserved1: %d\n", bmpHeader.reserved1);
-	printf("reserved2: %d\n", bmpHeader.reserved2);
-	printf("offset_pixel_array: %d\n", bmpHeader.offset_pixel_array);
-
     printf("dibHeader.size: %d\n", dibHeader.size);
     printf("dibHeader.width: %d\n", dibHeader.width);
     printf("dibHeader.height: %d\n", dibHeader.height);
@@ -111,6 +103,26 @@ int main(int argc, char *argv[]) {
     printf("dibHeader.printResVert: %d\n", dibHeader.printResVert);
     printf("dibHeader.numColorsInPalette: %d\n", dibHeader.numColorsInPalette);
     printf("dibHeader.numImportantColors: %d\n", dibHeader.numImportantColors);
+
+    return dibHeader;
+}
+
+
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        print_usage(argv);
+    }
+    
+	FILE* infile = fopen(argv[1], "rb");
+    if (!infile) {
+        fprintf(stderr, "No filename or bad filename specified\n");
+        print_usage(argv);
+    }
+    
+	//read bitmap file header (14 bytes)
+    struct BMP_Header bmpHeader = readBmpHeader(infile);
+	//read dib file header 
+    struct DIB_Header dibHeader = readDibHeader(infile);
 
     int bytePad = BYTE_PAD(dibHeader.width);
 
@@ -127,7 +139,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to malloc blurredPixelRows, quitting!\n");
         exit(-1);
     }
-
 
     // Malloc structures to hold pixel data per row (including possible byte pad)
     for (int i = 0; i < dibHeader.height; i++) {
@@ -686,3 +697,4 @@ void * computeBoxBlur(void *blurArgs) {
 
     return NULL;
 }
+
